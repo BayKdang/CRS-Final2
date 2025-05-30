@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
+// Custom color variables - define before importing Bootstrap
+$primary: #4dabf7; // Lighter blue for primary buttons
+$primary-hover: #339af0; // Slightly darker shade for hover state
+
+// Additional custom colors
+$secondary: #6c757d;
+$success: #20c997;
+$info: #0dcaf0;
+$warning: #ffc107;
+$danger: #dc3545;
+$light: #f8f9fa;
+$dark: #212529;
+
+// Import Bootstrap - if you're using custom Bootstrap import
+// @import "../../../node_modules/bootstrap/scss/bootstrap";
+
+// Global styles
+body {
+  font-family: 'DM Sans', sans-serif;
+}
+
+// Custom button styles
+.btn-primary {
+  background-color: $primary;
+  border-color: $primary;
+  
+  &:hover, &:focus, &:active {
+    background-color: $primary-hover !important;
+    border-color: $primary-hover !important;
+  }
+}
+
+// For outline buttons
+.btn-outline-primary {
+  color: $primary;
+  border-color: $primary;
+  
+  &:hover, &:focus {
+    background-color: $primary;
+    border-color: $primary;
+  }
+}
+
+// Keep some specific buttons with original styling if needed
+.navbar .btn-outline-light {
+  // Keep navbar search button original styling
+}
+
+// Text color utility
+.text-primary {
+  color: $primary !important;
+}
+
+// Other custom styles for your car website
+.hero-section {
+  min-height: 75vh;
+  display: flex;
+  align-items: center;
+}
+
+.car-card {
+  transition: transform 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-5px);
+  }
+}
