@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BookingController;
 use App\Http\Controllers\admin\AdminAuthController;
 use App\Http\Controllers\admin\BrandController;
 use App\Http\Controllers\admin\CategoryController;
@@ -25,8 +26,14 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user/profile', [AuthController::class, 'profile']);
+
+    // Booking routes
+    Route::post('/check-availability', [BookingController::class, 'checkAvailability']);
     Route::post('/bookings', [BookingController::class, 'store']);
+    Route::get('/bookings/{id}', [BookingController::class, 'show']);
     Route::get('/user/bookings', [BookingController::class, 'index']);
+    Route::post('/bookings/{id}/payment', [BookingController::class, 'processPayment']);
+    Route::post('/bookings/{id}/cancel', [BookingController::class, 'cancel']);
 });
 
 // Admin authentication route
