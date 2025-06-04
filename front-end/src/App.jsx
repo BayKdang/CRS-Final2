@@ -26,6 +26,7 @@ import BookingDetail from './components/admin/BookingDetail';
 import MyBookings from './components/common/MyBookings';
 import Profile from './components/user/Profile'; // Import the Profile component
 import ProtectedRoute from './components/common/ProtectedRoute'; // Import the ProtectedRoute component
+import CustomerManagement from './components/admin/CustomerManagement';
 
 function App() {
   return (
@@ -138,6 +139,15 @@ function App() {
                 <ProtectedRoute>
                   <Profile />
                 </ProtectedRoute>
+              } />
+              
+              {/* Admin customer management route */}
+              <Route path="/admin/customers" element={
+                <ProtectedAdminRoute>
+                  <ErrorBoundary>
+                    <CustomerManagement />
+                  </ErrorBoundary>
+                </ProtectedAdminRoute>
               } />
               
               {/* Catch all other admin routes */}

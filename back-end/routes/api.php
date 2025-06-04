@@ -54,6 +54,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/admin/bookings/{id}', [AdminBookingController::class, 'show']);
     Route::put('/admin/bookings/{id}/status', [AdminBookingController::class, 'updateStatus']);
     Route::get('/admin/booking-stats', [AdminBookingController::class, 'getStats']);
+
+    // Admin customer management routes
+    Route::get('/admin/customers', [App\Http\Controllers\Admin\CustomerController::class, 'index']);
+    Route::get('/admin/customers/{id}', [App\Http\Controllers\Admin\CustomerController::class, 'show']);
 });
 
 // User profile and booking management
