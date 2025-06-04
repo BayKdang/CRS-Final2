@@ -25,6 +25,7 @@ const CarSkeleton = () => {
 };
 
 const Shop = () => {
+  // Existing state variables
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [cars, setCars] = useState([]);
@@ -34,7 +35,7 @@ const Shop = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionRef = useRef();
   
-  // Ah nis filter states kom pas nhe nhai anh vai
+  // Filter states
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
   const [filters, setFilters] = useState({
@@ -47,7 +48,12 @@ const Shop = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  // ah nis fetch api all jab pi cars to brands
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1', 10));
+  const [totalPages, setTotalPages] = useState(1);
+  const [carsPerPage] = useState(12); // 4x3 grid
+
+  // Fetch cars, brands, categories
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -121,33 +127,41 @@ const Shop = () => {
       newParams.delete('q');
     }
     
+    // Reset to page 1 when searching
+    newParams.set('page', '1');
+    
     // Update URL with the new params
     setSearchParams(newParams);
+    setCurrentPage(1);
   };
 
   // Handle filter changes
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
   
-  // Update filters state
-  setFilters(prev => ({
-    ...prev,
-    [name]: value
-  }));
-  
-  // Create a new URLSearchParams object
-  const newParams = new URLSearchParams(searchParams);
-  
-  // Set or remove the filter parameter with the same name
-  if (value) {
-    newParams.set(name, value);  // This should use 'brand_id' not 'brand'
-  } else {
-    newParams.delete(name);
-  }
-  
-  // Update URL with the new params
-  setSearchParams(newParams);
-};
+    // Update filters state
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Create a new URLSearchParams object
+    const newParams = new URLSearchParams(searchParams);
+    
+    // Set or remove the filter parameter with the same name
+    if (value) {
+      newParams.set(name, value);
+    } else {
+      newParams.delete(name);
+    }
+    
+    // Reset to page 1 when filtering
+    newParams.set('page', '1');
+    
+    // Update URL with the new params
+    setSearchParams(newParams);
+    setCurrentPage(1);
+  };
 
   // Reset all filters
   const resetFilters = () => {
@@ -161,14 +175,16 @@ const Shop = () => {
       fuel_type: '',
     });
     
-    // Create a new URLSearchParams with only the search query
+    // Create a new URLSearchParams with only the search query and page
     const newParams = new URLSearchParams();
     if (searchQuery.trim()) {
       newParams.set('q', searchQuery.trim());
     }
+    newParams.set('page', '1');
     
     // Update URL with the new params
     setSearchParams(newParams);
+    setCurrentPage(1);
   };
 
   // Handle suggestion click
@@ -178,9 +194,11 @@ const Shop = () => {
     // Create a new URLSearchParams object
     const newParams = new URLSearchParams(searchParams);
     newParams.set('q', car.name);
+    newParams.set('page', '1');
     
     setSearchParams(newParams);
     setShowSuggestions(false);
+    setCurrentPage(1);
   };
 
   // Handle key press - search on Enter
@@ -260,11 +278,47 @@ const Shop = () => {
       }
       
       setFilteredCars(results);
+      
+      // Calculate total pages
+      setTotalPages(Math.ceil(results.length / carsPerPage));
+      
+      // Update current page from URL or reset to page 1 if out of bounds
+      const pageParam = searchParams.get('page');
+      const requestedPage = pageParam ? parseInt(pageParam, 10) : 1;
+      const maxPage = Math.ceil(results.length / carsPerPage);
+      
+      if (requestedPage > maxPage && maxPage > 0) {
+        // If current page is greater than max pages, reset to page 1
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('page', '1');
+        setSearchParams(newParams);
+        setCurrentPage(1);
+      } else {
+        setCurrentPage(requestedPage);
+      }
+      
       setIsLoading(false);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchParams, cars]);
+  }, [searchParams, cars, carsPerPage]);
+
+  // Handle page change
+  const handlePageChange = (pageNumber) => {
+    // Update URL search params
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', pageNumber.toString());
+    setSearchParams(newParams);
+    
+    // Update current page state
+    setCurrentPage(pageNumber);
+    
+    // Scroll to top of results
+    window.scrollTo({
+      top: document.querySelector('.car-results')?.offsetTop - 100 || 0,
+      behavior: 'smooth'
+    });
+  };
 
   // Get suggestions for dropdown
   const suggestions = cars.filter(car => 
@@ -284,6 +338,13 @@ const Shop = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Get paginated results
+  const getPaginatedResults = () => {
+    const startIndex = (currentPage - 1) * carsPerPage;
+    const endIndex = startIndex + carsPerPage;
+    return filteredCars.slice(startIndex, endIndex);
+  };
 
   // Filter stats
   const activeFiltersCount = Object.values(filters).filter(val => val !== '').length;
@@ -507,13 +568,13 @@ const Shop = () => {
           )}
 
           {/* Results Grid with Loading State */}
-          <div className="row">
+          <div className="row car-results">
             {isLoading ? (
               // Skeleton loading cards
-              Array.from({ length: 8 }).map((_, index) => <CarSkeleton key={index} />)
-            ) : filteredCars.length > 0 ? (
-              // Car results
-              filteredCars.map(car => (
+              Array.from({ length: carsPerPage }).map((_, index) => <CarSkeleton key={index} />)
+            ) : getPaginatedResults().length > 0 ? (
+              // Car results - now showing paginated results
+              getPaginatedResults().map(car => (
                 <div className="col-md-6 col-lg-3 mb-4" key={car.id}>
                   <CarCard car={car} />
                 </div>
@@ -540,6 +601,76 @@ const Shop = () => {
               </div>
             )}
           </div>
+          
+          {/* Pagination - only show if we have cars */}
+          {filteredCars.length > 0 && totalPages > 1 && (
+            <div className="d-flex justify-content-center mt-4 mb-4">
+              <nav aria-label="Car search results pagination">
+                <ul className="pagination">
+                  {/* Previous page button */}
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button 
+                      className="page-link" 
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      aria-label="Previous"
+                    >
+                      <i className="bi bi-chevron-left"></i>
+                    </button>
+                  </li>
+                  
+                  {/* Page numbers */}
+                  {[...Array(totalPages)].map((_, index) => {
+                    const pageNumber = index + 1;
+                    
+                    // Show limited page numbers for better UI
+                    if (
+                      pageNumber === 1 || 
+                      pageNumber === totalPages || 
+                      (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                    ) {
+                      return (
+                        <li 
+                          key={pageNumber} 
+                          className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}
+                        >
+                          <button 
+                            className="page-link"
+                            onClick={() => handlePageChange(pageNumber)}
+                          >
+                            {pageNumber}
+                          </button>
+                        </li>
+                      );
+                    } else if (
+                      pageNumber === currentPage - 2 ||
+                      pageNumber === currentPage + 2
+                    ) {
+                      return (
+                        <li key={pageNumber} className="page-item disabled">
+                          <span className="page-link">...</span>
+                        </li>
+                      );
+                    }
+                    
+                    return null;
+                  })}
+                  
+                  {/* Next page button */}
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button 
+                      className="page-link" 
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      aria-label="Next"
+                    >
+                      <i className="bi bi-chevron-right"></i>
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          )}
         </div>
         <Footer />
       </div>

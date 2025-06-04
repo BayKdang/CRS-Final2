@@ -27,6 +27,7 @@ import MyBookings from './components/common/MyBookings';
 import Profile from './components/user/Profile'; // Import the Profile component
 import ProtectedRoute from './components/common/ProtectedRoute'; // Import the ProtectedRoute component
 import CustomerManagement from './components/admin/CustomerManagement';
+import Reports from './components/admin/Reports';
 
 function App() {
   return (
@@ -146,6 +147,15 @@ function App() {
                 <ProtectedAdminRoute>
                   <ErrorBoundary>
                     <CustomerManagement />
+                  </ErrorBoundary>
+                </ProtectedAdminRoute>
+              } />
+              
+              {/* Admin reports route */}
+              <Route path="/admin/reports" element={
+                <ProtectedAdminRoute>
+                  <ErrorBoundary>
+                    <Reports />
                   </ErrorBoundary>
                 </ProtectedAdminRoute>
               } />

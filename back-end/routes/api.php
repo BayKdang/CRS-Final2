@@ -58,6 +58,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Admin customer management routes
     Route::get('/admin/customers', [App\Http\Controllers\Admin\CustomerController::class, 'index']);
     Route::get('/admin/customers/{id}', [App\Http\Controllers\Admin\CustomerController::class, 'show']);
+
+    // Reports routes
+    Route::get('/admin/reports', [App\Http\Controllers\Admin\ReportController::class, 'index']);
+    Route::get('/admin/reports/export', [App\Http\Controllers\Admin\ReportController::class, 'export']);
 });
 
 // User profile and booking management

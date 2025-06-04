@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useUserAuth } from '../../contexts/UserAuthContext';
 import { apiUrl } from './http';
 import { checkAvailability, createBooking } from '../../services/bookingService';
@@ -205,6 +205,16 @@ const Booking = () => {
     <>
       <Navbar />
       <div className="container py-5 mt-5">
+        {/* Add back button here */}
+        <div className="mb-4">
+          <button 
+            className="btn btn-outline-secondary" 
+            onClick={() => navigate(-1)}
+          >
+            <i className="bi bi-arrow-left me-2"></i>Back to Car Details
+          </button>
+        </div>
+        
         <div className="row">
           <div className="col-md-8">
             <h2 className="mb-4">Book Your Car</h2>
