@@ -8,6 +8,9 @@ use App\Http\Controllers\admin\AdminAuthController;
 use App\Http\Controllers\admin\BrandController;
 use App\Http\Controllers\admin\CategoryController;
 use App\Http\Controllers\admin\CarController;
+use App\Http\Controllers\admin\AdminBookingController;
+use App\Http\Controllers\UserProfileController;
+use App\Http\Controllers\UserBookingController;
 
 // Public routes - no authentication needed
 Route::get('/cars', [CarController::class, 'index']);
@@ -45,4 +48,18 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('brands', BrandController::class)->except(['index']);
     Route::apiResource('categories', CategoryController::class)->except(['index']);
     Route::apiResource('cars', CarController::class)->except(['index', 'show']);
+
+    // Admin booking management
+    Route::get('/admin/bookings', [AdminBookingController::class, 'index']);
+    Route::get('/admin/bookings/{id}', [AdminBookingController::class, 'show']);
+    Route::put('/admin/bookings/{id}/status', [AdminBookingController::class, 'updateStatus']);
+    Route::get('/admin/booking-stats', [AdminBookingController::class, 'getStats']);
+});
+
+// User profile and booking management
+Route::middleware('auth:sanctum')->prefix('user')->group(function () {
+    Route::get('/profile', [UserProfileController::class, 'getProfile']);
+    Route::put('/profile', [UserProfileController::class, 'updateProfile']);
+    Route::post('/change-password', [UserProfileController::class, 'changePassword']);
+    Route::get('/bookings', [UserBookingController::class, 'getUserBookings']);
 });

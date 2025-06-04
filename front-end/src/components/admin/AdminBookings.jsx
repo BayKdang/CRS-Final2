@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import AdminHeader from './AdminHeader';
 import AdminSidebar from './AdminSidebar';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { getAdminBookings } from '../../services/adminBookingService';
 
 const AdminBookings = () => {
   const navigate = useNavigate();
@@ -21,26 +22,8 @@ const AdminBookings = () => {
     const fetchBookings = async () => {
       try {
         setIsLoading(true);
-        
-        // Build query string from filters
-        const queryParams = new URLSearchParams();
-        if (filters.status) queryParams.append('status', filters.status);
-        if (filters.from_date) queryParams.append('from_date', filters.from_date);
-        if (filters.to_date) queryParams.append('to_date', filters.to_date);
-        
-        const url = `http://localhost:8000/api/admin/bookings?${queryParams.toString()}`;
-        const response = await fetch(url, {
-          headers: {
-            'Authorization': `Bearer ${admin.token}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch bookings');
-        }
-        
-        const data = await response.json();
-        setBookings(data.data || []);
+        const result = await getAdminBookings(filters, admin.token);
+        setBookings(result.data || []);
       } catch (error) {
         console.error('Error fetching bookings:', error);
         toast.error('Error loading bookings');
@@ -129,7 +112,40 @@ const AdminBookings = () => {
             <div>
               <button 
                 className="btn btn-sm btn-outline-secondary me-2"
-                onClick={() => {/* TODO: Add export functionality */}}
+                onClick={() => {
+                  // Export functionality (CSV export)
+                  if (bookings.length === 0) {
+                    toast.warning('No bookings to export');
+                    return;
+                  }
+                  
+                  // Create CSV content
+                  const headers = ['ID', 'Customer', 'Email', 'Car', 'Pickup Date', 'Return Date', 'Total', 'Status', 'Payment'];
+                  const rows = bookings.map(booking => [
+                    booking.id,
+                    booking.customer_name,
+                    booking.customer_email,
+                    booking.car?.name || 'N/A',
+                    new Date(booking.pickup_date).toLocaleDateString(),
+                    new Date(booking.return_date).toLocaleDateString(),
+                    booking.total_price,
+                    booking.status,
+                    booking.payment_status
+                  ]);
+                  
+                  const csvContent = [
+                    headers.join(','),
+                    ...rows.map(row => row.join(','))
+                  ].join('\n');
+                  
+                  // Create download link
+                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.setAttribute('href', url);
+                  link.setAttribute('download', `bookings_${new Date().toISOString().split('T')[0]}.csv`);
+                  link.click();
+                }}
               >
                 <i className="bi bi-file-earmark-text me-1"></i> Export List
               </button>
@@ -248,12 +264,6 @@ const AdminBookings = () => {
                               onClick={() => navigate(`/admin/bookings/${booking.id}`)}
                             >
                               <i className="bi bi-eye"></i>
-                            </button>
-                            <button 
-                              className="btn btn-sm btn-outline-secondary me-1"
-                              onClick={() => navigate(`/admin/bookings/edit/${booking.id}`)}
-                            >
-                              <i className="bi bi-pencil"></i>
                             </button>
                           </td>
                         </tr>

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import AdminHeader from './AdminHeader';
 import AdminSidebar from './AdminSidebar';
+import { getBookingStats } from '../../services/adminBookingService';
+import { toast } from 'react-toastify';
 
 const Dashboard = () => {
   const { admin, isAuthenticated, isLoading } = useAdminAuth();
@@ -21,18 +23,8 @@ const Dashboard = () => {
       try {
         setIsLoadingStats(true);
         
-        // Fetch booking stats
-        const statsResponse = await fetch('http://localhost:8000/api/admin/booking-stats', {
-          headers: {
-            'Authorization': `Bearer ${admin.token}`
-          }
-        });
-        
-        if (!statsResponse.ok) {
-          throw new Error('Failed to fetch booking stats');
-        }
-        
-        const statsData = await statsResponse.json();
+        // Get booking stats
+        const statsData = await getBookingStats(admin.token);
         setStats(statsData.data);
         
         // Fetch recent bookings
@@ -61,7 +53,224 @@ const Dashboard = () => {
     }
   }, [admin]);
   
-  // Convert stats for display
+  // Print booking receipt function
+  const printBookingReceipt = (bookingId) => {
+    try {
+      // Find the booking by ID
+      const booking = recentBookings.find(b => b.id === bookingId) || recentBookings[0];
+      if (!booking) {
+        toast.error('Booking information not available');
+        return;
+      }
+      
+      const car = booking.car || {};
+      const currentDate = new Date().toLocaleDateString();
+      
+      // Open a new window for printing
+      const printWindow = window.open('', '_blank');
+      
+      // Generate receipt content
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Booking Receipt #${booking.id}</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                color: #333;
+              }
+              .receipt {
+                max-width: 800px;
+                margin: 0 auto;
+                border: 1px solid #ddd;
+                padding: 20px;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 1px solid #ddd;
+              }
+              .title {
+                text-align: center;
+                margin-bottom: 20px;
+              }
+              h1, h2, h3 {
+                color: #444;
+              }
+              .section {
+                margin-bottom: 20px;
+              }
+              .section h3 {
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 5px;
+                margin-bottom: 10px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+              }
+              td {
+                padding: 8px 0;
+              }
+              .label {
+                width: 150px;
+                font-weight: bold;
+              }
+              .footer {
+                margin-top: 40px;
+                text-align: center;
+                font-style: italic;
+                color: #555;
+              }
+              @media print {
+                .receipt {
+                  border: none;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="receipt">
+              <!-- Company Header -->
+              <div class="header">
+                <h1>Car Rental System</h1>
+                <p>123 Main Street, City, Country</p>
+                <p>Phone: (123) 456-7890 | Email: info@carrentals.com</p>
+              </div>
+              
+              <!-- Receipt Title -->
+              <div class="title">
+                <h2>BOOKING RECEIPT</h2>
+                <p>Date: ${currentDate}</p>
+              </div>
+              
+              <!-- Booking Details -->
+              <div class="section">
+                <h3>Booking Information</h3>
+                <table>
+                  <tr>
+                    <td class="label">Booking ID:</td>
+                    <td>#${booking.id}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Date:</td>
+                    <td>${formatDate(booking.created_at)}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Status:</td>
+                    <td>${booking.status.toUpperCase()}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Pickup Date:</td>
+                    <td>${formatDate(booking.pickup_date)}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Return Date:</td>
+                    <td>${formatDate(booking.return_date)}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Location:</td>
+                    <td>${booking.pickup_location || 'Main Office'}</td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- Customer Details -->
+              <div class="section">
+                <h3>Customer Information</h3>
+                <table>
+                  <tr>
+                    <td class="label">Name:</td>
+                    <td>${booking.customer_name}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Email:</td>
+                    <td>${booking.customer_email}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Phone:</td>
+                    <td>${booking.customer_phone || 'N/A'}</td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- Car Details -->
+              <div class="section">
+                <h3>Car Information</h3>
+                <table>
+                  <tr>
+                    <td class="label">Car:</td>
+                    <td>${car.name || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Brand:</td>
+                    <td>${car.brand?.name || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Model:</td>
+                    <td>${car.model || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Year:</td>
+                    <td>${car.year || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">License Plate:</td>
+                    <td>${car.license_plate || 'N/A'}</td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- Payment Details -->
+              <div class="section">
+                <h3>Payment Information</h3>
+                <table>
+                  <tr>
+                    <td class="label">Base Rate:</td>
+                    <td>$${parseFloat(booking.subtotal || 0).toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Tax:</td>
+                    <td>$${parseFloat(booking.tax_amount || 0).toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Total:</td>
+                    <td style="font-weight: bold;">$${parseFloat(booking.total_price || 0).toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Payment Status:</td>
+                    <td>${booking.payment_status || 'Pending'}</td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- Thank You Note -->
+              <div class="footer">
+                <p>Thank you for choosing our Car Rental Service!</p>
+                <p>For questions or assistance, please contact us at (123) 456-7890.</p>
+              </div>
+            </div>
+          </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      
+      // Wait for resources to load then print
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error printing receipt:', error);
+      toast.error('Error printing receipt');
+    }
+  };
+  
+  // Update displayStats to include print buttons
   const displayStats = [
     { 
       title: 'Total Bookings', 
@@ -91,6 +300,7 @@ const Dashboard = () => {
   
   // Format date
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -143,13 +353,15 @@ const Dashboard = () => {
             {displayStats.map((stat, index) => (
               <div className="col-md-6 col-xl-3" key={index}>
                 <div className="card border-0 shadow-sm">
-                  <div className="card-body d-flex align-items-center">
-                    <div className={`bg-${stat.color} bg-opacity-10 p-3 rounded me-3`}>
-                      <i className={`bi ${stat.icon} fs-4 text-${stat.color}`}></i>
-                    </div>
-                    <div>
-                      <h5 className="card-title mb-0">{stat.value}</h5>
-                      <p className="card-text text-muted small mb-0">{stat.title}</p>
+                  <div className="card-body">
+                    <div className="d-flex align-items-center mb-3">
+                      <div className={`bg-${stat.color} bg-opacity-10 p-3 rounded me-3`}>
+                        <i className={`bi ${stat.icon} fs-4 text-${stat.color}`}></i>
+                      </div>
+                      <div>
+                        <h5 className="card-title mb-0">{stat.value}</h5>
+                        <p className="card-text text-muted small mb-0">{stat.title}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -194,9 +406,18 @@ const Dashboard = () => {
                             </span>
                           </td>
                           <td>
-                            <Link to={`/admin/bookings/${booking.id}`} className="btn btn-sm btn-outline-primary me-1">
-                              <i className="bi bi-eye"></i>
-                            </Link>
+                            <div className="btn-group">
+                              <Link to={`/admin/bookings/${booking.id}`} className="btn btn-sm btn-outline-primary me-1">
+                                <i className="bi bi-eye"></i>
+                              </Link>
+                              <button 
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() => printBookingReceipt(booking.id)}
+                                title="Print Receipt"
+                              >
+                                <i className="bi bi-printer"></i>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))

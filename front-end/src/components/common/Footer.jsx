@@ -7,7 +7,7 @@ const Footer = () => {
       <div className="container">
         <div className="row g-4">
           <div className="col-lg-4">
-            <h5 className="mb-3">CarMarket</h5>
+            <h5 className="mb-3">JOUL</h5>
             <p className="text-white">Your trusted destination for quality vehicles since 2010. We're committed to helping you find the perfect car for your lifestyle and budget.</p>
             <div className="d-flex gap-3 mt-3">
               <a href="#" className="text-white"><i className="bi bi-facebook fs-5"></i></a>
@@ -46,7 +46,7 @@ const Footer = () => {
         <hr className="mt-4 mb-3" />
         <div className="row">
           <div className="col-md-6 text-center text-md-start">
-            <p className="text-white mb-md-0">© 2023 CarMarket. All rights reserved.</p>
+            <p className="text-white mb-md-0">© 2023 JOUL. All rights reserved.</p>
           </div>
           <div className="col-md-6 text-center text-md-end">
             <a href="#" className="text-white text-decoration-none me-3">Privacy Policy</a>

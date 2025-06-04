@@ -21,7 +21,7 @@ const Navbar = () => {
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
       <div className="container">
         {/* Logo on the left */}
-        <Link className="navbar-brand" to="/">Car Rental</Link>
+        <Link className="navbar-brand" to="/">JOUL</Link>
         
         {/* Mobile toggle button */}
         <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">

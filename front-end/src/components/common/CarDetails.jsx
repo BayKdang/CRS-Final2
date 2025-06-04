@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import Footer from './Footer';
 import { apiUrl } from './http';
 import { useUserAuth } from '../../contexts/UserAuthContext';
@@ -207,13 +207,25 @@ const CarDetails = () => {
                 </div>
                 
                 {/* Book Now Button */}
-                <button 
-                  className="btn btn-primary btn-lg w-100"
-                  onClick={handleBookNow}
-                  disabled={car.status !== 'available'}
-                >
-                  {car.status === 'available' ? 'Book Now' : 'Currently Unavailable'}
-                </button>
+                <div className="mt-4">
+                  <button 
+                    className="btn btn-primary btn-lg"
+                    onClick={() => {
+                      if (isAuthenticated) {
+                        navigate(`/booking/${car.id}`);
+                      } else {
+                        // Show login modal or redirect to login
+                        alert('Please login to book this car');
+                        // Assuming you have a login modal with ID 'loginModal'
+                        const loginModal = new window.bootstrap.Modal(document.getElementById('loginModal'));
+                        loginModal.show();
+                      }
+                    }}
+                    disabled={car.status !== 'available'}
+                  >
+                    {car.status === 'available' ? 'Book Now' : 'Currently Unavailable'}
+                  </button>
+                </div>
               </div>
             </div>
             

@@ -1,438 +1,470 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from './Navbar';
-import Footer from './Footer';
-import { apiUrl } from './http';
 import { useUserAuth } from '../../contexts/UserAuthContext';
+import { apiUrl } from './http';
+import { checkAvailability, createBooking } from '../../services/bookingService';
+import Footer from './Footer';
+import Navbar from './Navbar';
 
-// Booking page skeleton
-const BookingSkeleton = () => {
-  return (
-    <div className="container py-5">
-      <div className="placeholder-glow mb-4">
-        <span className="placeholder col-2"></span>
-      </div>
-      
-      <div className="row">
-        <div className="col-lg-8 mb-4">
-          <div className="card bg-light mb-4">
-            <div className="card-body placeholder-glow">
-              <h5 className="placeholder col-6 mb-3"></h5>
-              <div className="d-flex mb-4">
-                <div className="placeholder bg-secondary me-3" style={{ width: "100px", height: "100px" }}></div>
-                <div>
-                  <h6 className="placeholder col-8 mb-2"></h6>
-                  <p className="placeholder col-4"></p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="card bg-light">
-            <div className="card-body placeholder-glow">
-              <h5 className="placeholder col-6 mb-3"></h5>
-              <div className="row g-3 mb-3">
-                <div className="col-md-6">
-                  <span className="placeholder col-12" style={{ height: "40px" }}></span>
-                </div>
-                <div className="col-md-6">
-                  <span className="placeholder col-12" style={{ height: "40px" }}></span>
-                </div>
-                <div className="col-md-6">
-                  <span className="placeholder col-12" style={{ height: "40px" }}></span>
-                </div>
-                <div className="col-md-6">
-                  <span className="placeholder col-12" style={{ height: "40px" }}></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="col-lg-4">
-          <div className="card bg-light mb-4">
-            <div className="card-body placeholder-glow">
-              <h5 className="placeholder col-8 mb-4"></h5>
-              <div className="placeholder col-12 mb-3" style={{ height: "250px" }}></div>
-              <div className="placeholder col-12" style={{ height: "50px" }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
+// Assuming this component already exists - we're just updating it
 const Booking = () => {
-  const { id } = useParams();
+  const { id: carId } = useParams();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isAuthenticated } = useUserAuth();
+  
   const [car, setCar] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { user } = useUserAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(true);
   
-  // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    pickupLocation: '',
-    dropoffLocation: '',
-    additionalNotes: ''
+    car_id: carId,
+    pickup_date: '',
+    return_date: '',
+    pickup_location: '',
+    return_location: '',
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    notes: ''
   });
   
-  // Date selection
-  const [dateRange, setDateRange] = useState({
-    startDate: null,
-    endDate: null
-  });
+  // Calculate rental days and total price
+  const [rentalDays, setRentalDays] = useState(0);
+  const [totalPrice, setTotalPrice] = useState(0);
   
-  // Fetch car data from API
+  // Fetch car details
   useEffect(() => {
     const fetchCarDetails = async () => {
       try {
         setIsLoading(true);
-        
-        // Check if user is authenticated
-        if (!user?.token) {
-          // Redirect to login if not authenticated
-          sessionStorage.setItem('bookingAfterLogin', `/booking/${id}`);
-          navigate('/');
-          return;
-        }
-        
-        // Fetch car details from API
-        const response = await fetch(`${apiUrl}/cars/${id}`);
+        const response = await fetch(`${apiUrl}/cars/${carId}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch car details');
         }
         
         const data = await response.json();
-        setCar(data.data);
         
-        // Pre-fill form with user data if available
-        if (user) {
-          setFormData(prev => ({
-            ...prev,
-            name: user.name || '',
-            email: user.email || '',
-            phone: user.phone || '',
-          }));
+        // Debug the response to see what we're getting
+        console.log("API Response:", data);
+        
+        // More flexible check - look for car data in any property
+        if (data && (data.data || data.car)) {
+          setCar(data.data || data.car);
+          
+          // Prefill form with user data if available
+          if (user) {
+            setFormData(prev => ({
+              ...prev,
+              customer_name: user.name || '',
+              customer_email: user.email || ''
+            }));
+          }
+        } else {
+          console.error("Unexpected API response format:", data);
+          throw new Error('Could not find car data in the server response');
         }
       } catch (error) {
-        console.error('Error fetching car details:', error);
-        setError(error.message);
+        console.error('Error fetching car:', error);
+        setError('Failed to load car details. Please try again.');
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     fetchCarDetails();
-  }, [id, user, navigate]);
+  }, [carId, user]);
   
-  // Handle input change
-  const handleInputChange = (e) => {
+  // Calculate rental duration and price whenever dates change
+  useEffect(() => {
+    if (formData.pickup_date && formData.return_date && car) {
+      const pickup = new Date(formData.pickup_date);
+      const returnDate = new Date(formData.return_date);
+      
+      // Calculate difference in days
+      const diffTime = Math.abs(returnDate - pickup);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      setRentalDays(diffDays);
+      setTotalPrice(car.price * diffDays);
+    }
+  }, [formData.pickup_date, formData.return_date, car]);
+  
+  // Handle input changes
+  const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
       [name]: value
     });
-  };
-  
-  // Calculate rental duration in days
-  const calculateDuration = () => {
-    if (!dateRange.startDate || !dateRange.endDate) return 0;
     
-    const start = new Date(dateRange.startDate);
-    const end = new Date(dateRange.endDate);
-    const diffTime = Math.abs(end - start);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return diffDays + 1; // Include both start and end days
+    // Reset availability check when dates change
+    if (name === 'pickup_date' || name === 'return_date') {
+      setIsAvailable(true);
+    }
   };
   
-  // Calculate total cost
-  const calculateTotal = () => {
-    const duration = calculateDuration();
-    const dailyRate = car?.price || 0;
-    const subtotal = dailyRate * duration;
-    const tax = subtotal * 0.1; // 10% tax
-    return (subtotal + tax).toLocaleString();
-  };
-  
-  // Handle form submission - connect to API
-  const handleSubmit = async (e) => {
+  // Check availability
+  const handleCheckAvailability = async (e) => {
     e.preventDefault();
     
-    // Validate form
-    if (!dateRange.startDate || !dateRange.endDate) {
-      alert("Please select rental dates");
-      return;
-    }
-    
-    if (Object.values(formData).some(value => !value)) {
-      alert("Please fill in all fields");
+    if (!formData.pickup_date || !formData.return_date) {
+      setError('Please select pickup and return dates');
       return;
     }
     
     try {
-      // Create booking in the database
-      const response = await fetch(`${apiUrl}/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`
-        },
-        body: JSON.stringify({
-          car_id: car.id,
-          pickup_date: dateRange.startDate,
-          return_date: dateRange.endDate,
-          pickup_location: formData.pickupLocation,
-          return_location: formData.dropoffLocation,
-          notes: formData.additionalNotes,
-          customer_name: formData.name,
-          customer_email: formData.email,
-          customer_phone: formData.phone,
-        })
-      });
+      setIsSubmitting(true);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create booking');
+      const result = await checkAvailability(
+        carId,
+        formData.pickup_date,
+        formData.return_date,
+        user.token
+      );
+      
+      setIsAvailable(result.available);
+      if (!result.available) {
+        setError('This car is not available for the selected dates');
+      } else {
+        setError(null);
       }
-      
-      const bookingData = await response.json();
-      
-      // Navigate to checkout with the booking ID
-      navigate(`/checkout/${bookingData.data.id}`);
-      
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      alert(`Failed to create booking: ${error.message}`);
+    } catch (err) {
+      setError('Error checking availability. Please try again.');
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
-  // Simulate loading delay
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+  // Submit booking
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    return () => clearTimeout(timer);
-  }, []);
-
-  // If car not found
-  if (!car && !isLoading) {
+    if (!isAvailable) {
+      setError('This car is not available for the selected dates');
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      
+      const result = await createBooking({
+        car_id: carId,
+        pickup_date: formData.pickup_date,
+        return_date: formData.return_date,
+        pickup_location: formData.pickup_location,
+        return_location: formData.return_location,
+        customer_name: formData.customer_name,
+        customer_email: formData.customer_email,
+        customer_phone: formData.customer_phone,
+        notes: formData.notes
+      }, user.token);
+      
+      if (result.success) {
+        // Navigate to checkout page with booking ID
+        navigate(`/checkout/${result.data.id}`);
+      } else {
+        setError(result.message || 'Failed to create booking');
+      }
+    } catch (err) {
+      setError('Error creating booking. Please try again.');
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  // Check if user is authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/booking/${carId}` } });
+    }
+  }, [isAuthenticated, navigate, carId]);
+  
+  if (isLoading) {
     return (
       <>
-        <div className="container py-5 mt-5 text-center">
-          <div className="py-5">
-            <i className="bi bi-exclamation-circle display-1 text-muted mb-4"></i>
-            <h2>Car Not Found</h2>
-            <p className="lead text-muted">The car you're looking for doesn't exist.</p>
-            <button 
-              className="btn btn-primary mt-3"
-              onClick={() => navigate('/shop')}
-            >
-              Browse Available Cars
-            </button>
+        <Navbar />
+        <div className="container py-5 mt-5">
+          <div className="text-center my-5">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-3">Loading car details...</p>
           </div>
         </div>
         <Footer />
       </>
     );
   }
-
+  
   return (
     <>
-      <div className="min-vh-100 d-flex flex-column">
-        {isLoading ? (
-          <BookingSkeleton />
-        ) : (
-          <div className="container py-5 mt-5 flex-grow-1">
-            {/* Back Button */}
-            <button
-              className="btn btn-outline-secondary mb-4"
-              onClick={() => navigate(-1)}
-            >
-              <i className="bi bi-arrow-left me-2"></i>
-              Back
-            </button>
+      <Navbar />
+      <div className="container py-5 mt-5">
+        <div className="row">
+          <div className="col-md-8">
+            <h2 className="mb-4">Book Your Car</h2>
             
-            <h1 className="mb-4">Book Your Rental</h1>
+            {error && (
+              <div className="alert alert-danger">{error}</div>
+            )}
             
-            <div className="row">
-              {/* Booking Form */}
-              <div className="col-lg-8 mb-4">
-                <div className="card shadow-sm mb-4">
-                  <div className="card-body">
-                    <h5 className="card-title mb-3">Selected Vehicle</h5>
-                    <div className="d-flex mb-3">
-                      <img 
-                        src={`${car ? 'http://localhost:8000/' + car.image : ''}`}
-                        alt={car?.name}
-                        className="rounded me-3"
-                        style={{ width: "100px", height: "100px", objectFit: "cover" }}
-                      />
-                      <div>
-                        <h6 className="mb-1">{car?.name}</h6>
-                        <p className="text-primary mb-0">${parseFloat(car?.price || 0).toLocaleString()} per day</p>
+            {car && (
+              <div className="card mb-4">
+                <div className="card-body">
+                  <div className="row">
+                    <div className="col-md-4">
+                      {car.image ? (
+                        <img 
+                          src={`${apiUrl.replace('/api', '')}/${car.image}`} 
+                          alt={car.name} 
+                          className="img-fluid rounded"
+                        />
+                      ) : (
+                        <div className="bg-light d-flex align-items-center justify-content-center rounded" style={{height: '150px'}}>
+                          <i className="bi bi-car-front fs-1 text-secondary"></i>
+                        </div>
+                      )}
+                    </div>
+                    <div className="col-md-8">
+                      <h4>{car.name}</h4>
+                      <p className="text-muted">
+                        {car.brand?.name && `${car.brand.name} • `}
+                        {car.category?.name}
+                      </p>
+                      <div className="mb-2">
+                        <span className="badge bg-primary me-2">${car.price}/day</span>
+                        <span className={`badge bg-${car.status === 'available' ? 'success' : 'warning'}`}>
+                          {car.status}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
-                
-                <div className="card shadow-sm">
-                  <div className="card-body">
-                    <h5 className="card-title mb-3">Personal Information</h5>
-                    <form onSubmit={handleSubmit}>
-                      <div className="row g-3">
+              </div>
+            )}
+            
+            <form onSubmit={handleSubmit}>
+              <div className="card mb-4">
+                <div className="card-header bg-light">
+                  <h5 className="mb-0">Rental Details</h5>
+                </div>
+                <div className="card-body">
+                  <div className="row mb-3">
+                    <div className="col-md-6">
+                      <label htmlFor="pickup_date" className="form-label">Pickup Date*</label>
+                      <input 
+                        type="date" 
+                        className="form-control" 
+                        id="pickup_date" 
+                        name="pickup_date"
+                        value={formData.pickup_date}
+                        onChange={handleChange}
+                        min={new Date().toISOString().split('T')[0]}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label htmlFor="return_date" className="form-label">Return Date*</label>
+                      <input 
+                        type="date" 
+                        className="form-control" 
+                        id="return_date" 
+                        name="return_date"
+                        value={formData.return_date}
+                        onChange={handleChange}
+                        min={formData.pickup_date || new Date().toISOString().split('T')[0]}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <button 
+                    type="button" 
+                    className="btn btn-outline-primary mb-3"
+                    onClick={handleCheckAvailability}
+                    disabled={isSubmitting || !formData.pickup_date || !formData.return_date}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Checking...
+                      </>
+                    ) : 'Check Availability'}
+                  </button>
+                  
+                  {isAvailable && formData.pickup_date && formData.return_date && (
+                    <>
+                      <div className="row mb-3">
                         <div className="col-md-6">
-                          <label htmlFor="name" className="form-label">Full Name</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            id="name"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleInputChange}
+                          <label htmlFor="pickup_location" className="form-label">Pickup Location*</label>
+                          <input 
+                            type="text" 
+                            className="form-control" 
+                            id="pickup_location" 
+                            name="pickup_location"
+                            value={formData.pickup_location}
+                            onChange={handleChange}
                             required
                           />
                         </div>
                         <div className="col-md-6">
-                          <label htmlFor="email" className="form-label">Email</label>
-                          <input
-                            type="email"
-                            className="form-control"
-                            id="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleInputChange}
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="phone" className="form-label">Phone</label>
-                          <input
-                            type="tel"
-                            className="form-control"
-                            id="phone"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleInputChange}
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="pickupLocation" className="form-label">Pickup Location</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            id="pickupLocation"
-                            name="pickupLocation"
-                            value={formData.pickupLocation}
-                            onChange={handleInputChange}
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="dropoffLocation" className="form-label">Drop-off Location</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            id="dropoffLocation"
-                            name="dropoffLocation"
-                            value={formData.dropoffLocation}
-                            onChange={handleInputChange}
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="additionalNotes" className="form-label">Additional Notes</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            id="additionalNotes"
-                            name="additionalNotes"
-                            value={formData.additionalNotes}
-                            onChange={handleInputChange}
+                          <label htmlFor="return_location" className="form-label">Return Location*</label>
+                          <input 
+                            type="text" 
+                            className="form-control" 
+                            id="return_location" 
+                            name="return_location"
+                            value={formData.return_location}
+                            onChange={handleChange}
                             required
                           />
                         </div>
                       </div>
-                    </form>
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
               
-              {/* Booking Summary */}
-              <div className="col-lg-4">
-                <div className="card shadow-sm">
-                  <div className="card-body">
-                    <h5 className="card-title mb-4">Booking Summary</h5>
-                    
-                    {/* Date Picker */}
-                    <div className="mb-4">
-                      <label className="form-label">Select Rental Dates</label>
-                      <div className="row g-2">
-                        <div className="col-6">
-                          <label className="form-label small text-muted">Start Date</label>
-                          <input
-                            type="date"
-                            className="form-control"
-                            onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
-                            min={new Date().toISOString().split('T')[0]}
+              {isAvailable && formData.pickup_date && formData.return_date && (
+                <>
+                  <div className="card mb-4">
+                    <div className="card-header bg-light">
+                      <h5 className="mb-0">Personal Information</h5>
+                    </div>
+                    <div className="card-body">
+                      <div className="row mb-3">
+                        <div className="col-md-6">
+                          <label htmlFor="customer_name" className="form-label">Full Name*</label>
+                          <input 
+                            type="text" 
+                            className="form-control" 
+                            id="customer_name" 
+                            name="customer_name"
+                            value={formData.customer_name}
+                            onChange={handleChange}
                             required
                           />
                         </div>
-                        <div className="col-6">
-                          <label className="form-label small text-muted">End Date</label>
-                          <input
-                            type="date"
-                            className="form-control"
-                            onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
-                            min={dateRange.startDate || new Date().toISOString().split('T')[0]}
+                        <div className="col-md-6">
+                          <label htmlFor="customer_phone" className="form-label">Phone Number*</label>
+                          <input 
+                            type="tel" 
+                            className="form-control" 
+                            id="customer_phone" 
+                            name="customer_phone"
+                            value={formData.customer_phone}
+                            onChange={handleChange}
                             required
                           />
                         </div>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <label htmlFor="customer_email" className="form-label">Email Address*</label>
+                        <input 
+                          type="email" 
+                          className="form-control" 
+                          id="customer_email" 
+                          name="customer_email"
+                          value={formData.customer_email}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="mb-3">
+                        <label htmlFor="notes" className="form-label">Additional Notes</label>
+                        <textarea 
+                          className="form-control" 
+                          id="notes" 
+                          name="notes"
+                          value={formData.notes}
+                          onChange={handleChange}
+                          rows="3"
+                        ></textarea>
                       </div>
                     </div>
-                    
-                    {/* Summary */}
-                    {dateRange.startDate && dateRange.endDate && (
-                      <div className="bg-light p-3 rounded mb-4">
-                        <div className="d-flex justify-content-between mb-2">
-                          <span>Duration:</span>
-                          <span>{calculateDuration()} days</span>
-                        </div>
-                        <div className="d-flex justify-content-between mb-2">
-                          <span>Daily Rate:</span>
-                          <span>${car.price.toLocaleString()}</span>
-                        </div>
-                        <hr />
-                        <div className="d-flex justify-content-between fw-bold">
-                          <span>Total:</span>
-                          <span>${calculateTotal()}</span>
-                        </div>
+                  </div>
+                  
+                  <div className="card mb-4">
+                    <div className="card-header bg-light">
+                      <h5 className="mb-0">Booking Summary</h5>
+                    </div>
+                    <div className="card-body">
+                      <div className="d-flex justify-content-between mb-2">
+                        <span>Rental Period:</span>
+                        <span>{rentalDays} {rentalDays === 1 ? 'day' : 'days'}</span>
                       </div>
-                    )}
-                    
+                      <div className="d-flex justify-content-between mb-2">
+                        <span>Daily Rate:</span>
+                        <span>${car?.price || 0}/day</span>
+                      </div>
+                      <div className="d-flex justify-content-between font-weight-bold">
+                        <strong>Total:</strong>
+                        <strong>${totalPrice.toFixed(2)}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="d-grid">
                     <button 
-                      className="btn btn-primary w-100"
-                      onClick={handleSubmit}
-                      disabled={!dateRange.startDate || !dateRange.endDate}
+                      type="submit" 
+                      className="btn btn-primary btn-lg"
+                      disabled={isSubmitting}
                     >
-                      Confirm Booking
+                      {isSubmitting ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2"></span>
+                          Processing...
+                        </>
+                      ) : 'Continue to Payment'}
                     </button>
                   </div>
-                </div>
+                </>
+              )}
+            </form>
+          </div>
+          
+          <div className="col-md-4">
+            <div className="card sticky-top" style={{top: '100px'}}>
+              <div className="card-header bg-light">
+                <h5 className="mb-0">Booking Instructions</h5>
+              </div>
+              <div className="card-body">
+                <ul className="list-unstyled">
+                  <li className="mb-2">
+                    <i className="bi bi-calendar-check me-2 text-primary"></i>
+                    Select your pickup and return dates
+                  </li>
+                  <li className="mb-2">
+                    <i className="bi bi-geo-alt me-2 text-primary"></i>
+                    Choose your pickup and return locations
+                  </li>
+                  <li className="mb-2">
+                    <i className="bi bi-person-badge me-2 text-primary"></i>
+                    Provide your personal information
+                  </li>
+                  <li className="mb-2">
+                    <i className="bi bi-credit-card me-2 text-primary"></i>
+                    Proceed to checkout to complete your booking
+                  </li>
+                </ul>
+                <hr />
+                <p className="mb-0 small text-muted">
+                  <i className="bi bi-info-circle me-2"></i>
+                  You'll only be charged after confirming your booking on the next page.
+                </p>
               </div>
             </div>
           </div>
-        )}
-        <Footer />
+        </div>
       </div>
+      <Footer />
     </>
   );
 };

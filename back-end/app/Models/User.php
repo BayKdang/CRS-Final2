@@ -20,7 +20,13 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role', // Make sure this is included
+        'phone',
+        'address',
+        'city',
+        'country',
+        'dob',
+        'driving_license',
+        'avatar',
     ];
 
     /**
@@ -41,5 +47,14 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'dob' => 'date',
     ];
+
+    /**
+     * Get the bookings for the user.
+     */
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
 }

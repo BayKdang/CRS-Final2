@@ -59,4 +59,19 @@ class Booking extends Model
     {
         return $this->pickup_date->diffInDays($this->return_date) + 1;
     }
+
+    // Add these constants if they don't exist
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_CONFIRMED = 'confirmed';
+    public const STATUS_ACTIVE = 'active';  // Newly added status
+    public const STATUS_COMPLETED = 'completed';
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_CONFIRMED,
+        self::STATUS_ACTIVE,   // Include in array
+        self::STATUS_COMPLETED,
+        self::STATUS_CANCELLED
+    ];
 }
